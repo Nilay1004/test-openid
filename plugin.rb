@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# name: test-openid-connect
+# name: test-openid
 # about: Allows users to login to your forum using an OpenID Connect provider as authentication.
 # meta_topic_id: 103632
 # version: 1.1
