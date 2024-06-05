@@ -4,7 +4,7 @@
 # about: Allows users to login to your forum using an OpenID Connect provider as authentication.
 # meta_topic_id: 103632
 # version: 1.1
-# authors: David Taylor
+# authors: David Taylor, Nilay
 # url: https://github.com/discourse/discourse-openid-connect
 
 enabled_site_setting :openid_connect_enabled
@@ -103,7 +103,8 @@ after_initialize do
     def after_authenticate(auth, existing_account: nil)
       result = Auth::Result.new
 
-      result.email = PIIEncryption.decrypt_email(auth["info"]["email"])
+      decrypted_email = PIIEncryption.decrypt_email(auth["info"]["email"])
+      result.email = decrypted_email
       result.email_valid = auth["info"]["email_verified"]
       result.name = auth["info"]["name"]
       result.username = auth["info"]["preferred_username"]
@@ -118,7 +119,8 @@ after_initialize do
     end
 
     def after_create_account(user, auth)
-      current_info = ::PluginStore.set("openid_connect", "openid_connect_user_#{auth[:extra_data][:uid]}", {user_id: user.id})
+      encrypted_email = PIIEncryption.encrypt_email(auth[:extra_data][:uid])
+      ::PluginStore.set("openid_connect", "openid_connect_user_#{encrypted_email}", { user_id: user.id })
     end
   end
 end
@@ -144,16 +146,14 @@ on(:before_session_destroy) do |data|
 
   end_session_endpoint = authenticator.discovery_document["end_session_endpoint"].presence
   if !end_session_endpoint
-    authenticator.oidc_log "Logout: No end_session_endpoint found in discovery document",
-                           error: true
+    authenticator.oidc_log "Logout: No end_session_endpoint found in discovery document", error: true
     next
   end
 
   begin
     uri = URI.parse(end_session_endpoint)
   rescue URI::Error
-    authenticator.oidc_log "Logout: unable to parse end_session_endpoint #{end_session_endpoint}",
-                           error: true
+    authenticator.oidc_log "Logout: unable to parse end_session_endpoint #{end_session_endpoint}", error: true
   end
 
   authenticator.oidc_log "Logout: Redirecting user_id=#{data[:user].id} to end_session_endpoint"
